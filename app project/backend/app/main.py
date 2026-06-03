@@ -11,8 +11,11 @@ app.add_middleware(
         "http://localhost:5173",
         "http://localhost:5174",
         "http://localhost:5175",
+        "https://firstprojectaayudh.vercel.app",
+        "https://firstprojectaayudh-git-main-saugat-shrestha-s-projects.vercel.app",
+        "https://firstprojectaayudh-92atkuucn-saugat-shrestha-s-projects.vercel.app",
     ],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -79,7 +82,6 @@ def get_suppliers():
 def create_buyer(buyer: Buyer):
     try:
         buyer_data = buyer.model_dump() if hasattr(buyer, "model_dump") else buyer.dict()
-
         insert_row("buyers", buyer_data)
 
         return {
