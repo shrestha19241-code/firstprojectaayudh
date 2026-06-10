@@ -536,11 +536,6 @@ export default function App() {
                 <p>Find essential medical supplies quickly using the live product catalogue.</p>
               </article>
               <article>
-                <span>⚖️</span>
-                <h3>Compare Suppliers</h3>
-                <p>Review price, delivery speed, reliability and stock before ordering.</p>
-              </article>
-              <article>
                 <span>🗄️</span>
                 <h3>Supabase Storage</h3>
                 <p>Save order requests and retrieve order history from the database.</p>
@@ -789,11 +784,6 @@ export default function App() {
               </button>
             </form>
 
-            <p className="privacy-note">
-              {authMode === 'login'
-                ? 'Login is gated by sign up: enter the email and password you registered. Product search, supplier comparison, Supabase order saving, and order history retrieval stay connected to the existing backend.'
-                : 'This prototype saves buyer profile details to Supabase for demonstration. Your login email and password are stored securely in your browser so you can sign in afterwards.'}
-            </p>
           </section>
         </main>
       )}
