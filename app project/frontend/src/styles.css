@@ -347,6 +347,16 @@ body {
   padding: 12px 14px;
 }
 
+.auth-success {
+  background: rgba(34, 197, 94, 0.10);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  border-radius: 14px;
+  color: #15803d;
+  font-weight: 700;
+  margin: 0;
+  padding: 12px 14px;
+}
+
 .signup-form {
   gap: 18px;
 }
@@ -1094,12 +1104,56 @@ button:active {
   .brand h1 {
     font-size: 40px;
   }
-}.auth-success {
-  background: rgba(34, 197, 94, 0.10);
-  border: 1px solid rgba(34, 197, 94, 0.25);
-  border-radius: 14px;
+}
+
+.password-strength {
+  margin: 4px 0 8px;
+}
+
+.strength-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.25);
+  overflow: hidden;
+}
+
+.strength-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+
+.strength-weak span { background: #ef4444; }
+.strength-medium span { background: #f59e0b; }
+.strength-strong span { background: #22c55e; }
+
+.strength-label {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.strength-rules {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  color: #b45309;
+}
+
+.strength-rules.rule-pass {
   color: #15803d;
   font-weight: 700;
-  margin: 0;
-  padding: 12px 14px;
+}
+
+.otp-demo-code {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: 0.4rem;
+  text-align: center;
+  padding: 14px;
+  margin: 8px 0;
+  border-radius: 14px;
+  background: rgba(16, 185, 129, 0.10);
+  border: 1px dashed rgba(16, 185, 129, 0.5);
+  color: #0f5132;
 }
