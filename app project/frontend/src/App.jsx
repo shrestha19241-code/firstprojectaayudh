@@ -1,4 +1,4 @@
- import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { getProducts, getOffers, getSuppliers, createBuyer, createOrder, getOrders } from './services/api.js'
 import { getRecommendedOffer } from './utils/recommendation.js'
 import './styles.css'
@@ -886,20 +886,11 @@ export default function App() {
               <span className="badge">Dashboard</span>
               <h2>Welcome back, {user.name}</h2>
               <p>
-                Manage healthcare procurement orders, browse products, compare suppliers,
+                Manage healthcare procurement orders, browse products,
                 complete demo payments and track saved Supabase order history.
               </p>
               <div className="nav-buttons">
                 <button onClick={() => setScreen('products')}>Search Products</button>
-                <button
-                  className="secondary"
-                  onClick={async () => {
-                    await loadSuppliers()
-                    setScreen('suppliers')
-                  }}
-                >
-                  View Suppliers
-                </button>
                 <button
                   className="secondary"
                   onClick={async () => {
@@ -919,10 +910,6 @@ export default function App() {
               <strong>{products.length}</strong>
             </article>
             <article className="overview-card">
-              <span>Supplier offers</span>
-              <strong>{offers.length}</strong>
-            </article>
-            <article className="overview-card">
               <span>Saved orders</span>
               <strong>{visibleOrders.length > 0 ? visibleOrders.length : 'Live'}</strong>
             </article>
@@ -934,21 +921,6 @@ export default function App() {
               <h3>Browse Products</h3>
               <p>Explore medical supply categories and choose a product for supplier comparison.</p>
               <button onClick={() => setScreen('products')}>Search Products</button>
-            </article>
-
-            <article className="action-tile">
-              <span className="action-icon">🏥</span>
-              <h3>Supplier Directory</h3>
-              <p>Review registered suppliers, locations and reliability scores from Supabase.</p>
-              <button
-                className="secondary"
-                onClick={async () => {
-                  await loadSuppliers()
-                  setScreen('suppliers')
-                }}
-              >
-                View Suppliers
-              </button>
             </article>
 
             <article className="action-tile">
