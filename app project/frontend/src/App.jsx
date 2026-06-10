@@ -277,10 +277,15 @@ export default function App() {
   }, [])
 
   async function loadOrders() {
+    if (!user || !user.email) {
+      setOrders([])
+      return
+    }
     try {
       setLoading(true)
       setError('')
-      const orderData = await getOrders()
+      // Backend returns only THIS user's orders (filtered by email server-side).
+      const orderData = await getOrders(user.email)
       setOrders(orderData)
     } catch (err) {
       setError('Could not load order history from Supabase.')
