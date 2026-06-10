@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+ import React, { useEffect, useMemo, useState } from 'react'
 import { getProducts, getOffers, getSuppliers, createBuyer, createOrder, getOrders } from './services/api.js'
 import { getRecommendedOffer } from './utils/recommendation.js'
 import './styles.css'
@@ -118,19 +118,27 @@ function getProductKeywords(product) {
   return CATEGORY_IMAGE_KEYWORDS[product.category] || 'medical,healthcare,equipment'
 }
 
-// Build an ordered list of REAL-photo candidate URLs for a product.
-// `index` makes every product's images unique (different lock / seed),
-// so no two products ever share the same picture. None of these sources
-// overlay any logo or branding on the photo.
+// Build product-specific image URLs from an image-search thumbnail service.
+// Querying the actual product name returns a picture of THAT item (e.g. a
+// syringe shows a syringe), so images are specific rather than generic, and
+// the query is biased toward the isolated product (no people / scenery).
+function searchImageUrl(query, variant) {
+  const q = encodeURIComponent(query)
+  const host = `tse${(Math.abs(variant) % 4) + 1}.mm.bing.net`
+  return `https://${host}/th?q=${q}&w=600&h=400&c=7&rs=1&p=0&dpr=2&pid=1.7`
+}
+
 function getProductImageSources(product, index) {
-  const keywords = getProductKeywords(product)
-  const unique = (index >= 0 ? index : hashString(product.product_name) % 997) + 1
-  const seed = encodeURIComponent(`${product.product_name || 'item'}-${unique}`)
+  const variant = index >= 0 ? index : hashString(product.product_name)
+  const name = (product.product_name || 'medical product').trim()
+  const keywords = getProductKeywords(product).replace(/,/g, ' ')
   return [
-    // 1) Real medical photo matched to the product keyword (unique per product via lock).
-    `https://loremflickr.com/600/400/${keywords}?lock=${unique}`,
-    // 2) Reliable real-photo fallback, still unique per product, never branded.
-    `https://picsum.photos/seed/${seed}/600/400`,
+    // 1) Exact product by name -> a clean photo of that specific item.
+    searchImageUrl(`${name} medical product`, variant),
+    // 2) Same item, plainer query as a backup.
+    searchImageUrl(`${name}`, variant + 1),
+    // 3) Category-level product shot if the name returns nothing usable.
+    searchImageUrl(`${keywords} medical equipment product`, variant + 2),
   ]
 }
 
