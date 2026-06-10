@@ -51,6 +51,28 @@ function getCategoryDetails(category) {
   }
 }
 
+const ACCOUNTS_STORAGE_KEY = 'aayudh_accounts'
+
+function getStoredAccounts() {
+  try {
+    const raw = localStorage.getItem(ACCOUNTS_STORAGE_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch (err) {
+    console.error('Could not read saved accounts', err)
+    return {}
+  }
+}
+
+function saveStoredAccount(email, password, name) {
+  try {
+    const accounts = getStoredAccounts()
+    accounts[String(email).trim().toLowerCase()] = { password, name }
+    localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts))
+  } catch (err) {
+    console.error('Could not save account credentials', err)
+  }
+}
+
 export default function App() {
   const [screen, setScreen] = useState('login')
   const [user, setUser] = useState({ name: '', email: '' })
@@ -381,9 +403,24 @@ export default function App() {
                 const confirmPassword = formData.get('confirmPassword')
 
                 if (authMode === 'login') {
+                  const accounts = getStoredAccounts()
+                  const account = accounts[String(email).trim().toLowerCase()]
+
+                  if (!account) {
+                    setSignupStatus('idle')
+                    setAuthError('No account found for this email. Please sign up first.')
+                    return
+                  }
+
+                  if (account.password !== password) {
+                    setSignupStatus('idle')
+                    setAuthError('Incorrect password. Please try again.')
+                    return
+                  }
+
                   setAuthError('')
                   setSignupStatus('idle')
-                  setUser({ name: email.split('@')[0], email })
+                  setUser({ name: account.name || email.split('@')[0], email })
                   setScreen('dashboard')
                   return
                 }
@@ -416,6 +453,9 @@ export default function App() {
                   preferred_delivery_area: formData.get('preferred_delivery_area'),
                 }
 
+                // Save credentials locally so this buyer can log in afterwards
+                saveStoredAccount(email, password, contactPerson || email.split('@')[0])
+
                 try {
                   setLoading(true)
                   setError('')
@@ -428,8 +468,7 @@ export default function App() {
 
                   setAuthError('')
                   setSignupStatus('created')
-                  setUser({ name: contactPerson || email.split('@')[0], email })
-                  setScreen('dashboard')
+                  setAuthMode('login')
                 } catch (err) {
                   setSignupStatus('idle')
                   setAuthError('Buyer profile could not be saved to Supabase. Please check the backend and buyers table.')
@@ -515,6 +554,9 @@ export default function App() {
                   </section>
                 </div>
               )}
+              {authMode === 'login' && signupStatus === 'created' && (
+                <p className="privacy-note auth-success">Account created successfully. Please log in with the email and password you just registered.</p>
+              )}
               {authError && <p className="privacy-note auth-error">{authError}</p>}
               <button type="submit" disabled={authMode === 'signup' && signupStatus === 'saving'}>
                 {authMode === 'login'
@@ -529,8 +571,8 @@ export default function App() {
 
             <p className="privacy-note">
               {authMode === 'login'
-                ? 'Demo login only: your email is used to personalise dashboard and order forms. Product search, supplier comparison, Supabase order saving, and order history retrieval stay connected to the existing backend.'
-                : 'This prototype saves buyer profile details to Supabase for demonstration. Password is not stored.'}
+                ? 'Login is gated by sign up: enter the email and password you registered. Product search, supplier comparison, Supabase order saving, and order history retrieval stay connected to the existing backend.'
+                : 'This prototype saves buyer profile details to Supabase for demonstration. Your login email and password are stored securely in your browser so you can sign in afterwards.'}
             </p>
           </section>
         </main>
