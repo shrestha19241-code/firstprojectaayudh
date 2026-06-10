@@ -73,6 +73,42 @@ function saveStoredAccount(email, password, name) {
   }
 }
 
+const COMMON_PASSWORDS = [
+  'password', 'password1', 'password123', '123456789', '12345678', 'qwerty123',
+  'letmein', 'welcome1', 'admin123', 'iloveyou', 'abc123456', 'passw0rd',
+  'qwertyuiop', 'aayudh123', 'changeme1',
+]
+
+function validatePasswordStrict(password) {
+  const pw = String(password || '')
+  const errors = []
+  if (pw.length < 12) errors.push('at least 12 characters')
+  if (!/[A-Z]/.test(pw)) errors.push('an uppercase letter')
+  if (!/[a-z]/.test(pw)) errors.push('a lowercase letter')
+  if (!/[0-9]/.test(pw)) errors.push('a number')
+  if (!/[^A-Za-z0-9]/.test(pw)) errors.push('a special character')
+  if (COMMON_PASSWORDS.includes(pw.toLowerCase())) errors.push('to not be a common password')
+  return { valid: errors.length === 0, errors }
+}
+
+function getPasswordStrength(password) {
+  const pw = String(password || '')
+  let score = 0
+  if (pw.length >= 12) score++
+  if (/[A-Z]/.test(pw)) score++
+  if (/[a-z]/.test(pw)) score++
+  if (/[0-9]/.test(pw)) score++
+  if (/[^A-Za-z0-9]/.test(pw)) score++
+  const percent = (score / 5) * 100
+  if (score <= 2) return { level: 'weak', percent, label: 'Weak' }
+  if (score <= 4) return { level: 'medium', percent, label: 'Medium' }
+  return { level: 'strong', percent, label: 'Strong' }
+}
+
+function generateOtp() {
+  return String(Math.floor(100000 + Math.random() * 900000))
+}
+
 export default function App() {
   const [screen, setScreen] = useState('login')
   const [user, setUser] = useState({ name: '', email: '' })
@@ -95,6 +131,16 @@ export default function App() {
   const [cardCvv, setCardCvv] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [signupPassword, setSignupPassword] = useState('')
+  const [pendingAuthUser, setPendingAuthUser] = useState(null)
+  const [otpCode, setOtpCode] = useState('')
+  const [otpInput, setOtpInput] = useState('')
+  const [otpError, setOtpError] = useState('')
+  const [cpCurrent, setCpCurrent] = useState('')
+  const [cpNew, setCpNew] = useState('')
+  const [cpConfirm, setCpConfirm] = useState('')
+  const [cpError, setCpError] = useState('')
+  const [cpSuccess, setCpSuccess] = useState('')
 
   useEffect(() => {
     async function loadInitialData() {
@@ -302,6 +348,16 @@ export default function App() {
     setAuthMode('login')
     setAuthError('')
     setSignupStatus('idle')
+    setSignupPassword('')
+    setPendingAuthUser(null)
+    setOtpCode('')
+    setOtpInput('')
+    setOtpError('')
+    setCpCurrent('')
+    setCpNew('')
+    setCpConfirm('')
+    setCpError('')
+    setCpSuccess('')
     setScreen('login')
   }
 
@@ -420,8 +476,12 @@ export default function App() {
 
                   setAuthError('')
                   setSignupStatus('idle')
-                  setUser({ name: account.name || email.split('@')[0], email })
-                  setScreen('dashboard')
+                  const loginCode = generateOtp()
+                  setOtpCode(loginCode)
+                  setOtpInput('')
+                  setOtpError('')
+                  setPendingAuthUser({ name: account.name || email.split('@')[0], email })
+                  setScreen('mfa')
                   return
                 }
 
@@ -437,6 +497,12 @@ export default function App() {
 
                 if (authMode === 'signup' && password !== confirmPassword) {
                   setAuthError('Passwords do not match. Please confirm your password again.')
+                  return
+                }
+
+                const passwordCheck = validatePasswordStrict(password)
+                if (!passwordCheck.valid) {
+                  setAuthError('Password is not strong enough. It still needs: ' + passwordCheck.errors.join(', ') + '.')
                   return
                 }
 
@@ -468,6 +534,7 @@ export default function App() {
 
                   setAuthError('')
                   setSignupStatus('created')
+                  setSignupPassword('')
                   setAuthMode('login')
                 } catch (err) {
                   setSignupStatus('idle')
@@ -505,8 +572,28 @@ export default function App() {
                     </label>
                     <label className="form-label">
                       Password
-                      <input name="password" type="password" placeholder="Password" required />
+                      <input
+                        name="password"
+                        type="password"
+                        placeholder="Password"
+                        value={signupPassword}
+                        onChange={(event) => setSignupPassword(event.target.value)}
+                        required
+                      />
                     </label>
+                    {signupPassword && (
+                      <div className="password-strength">
+                        <div className={`strength-bar strength-${getPasswordStrength(signupPassword).level}`}>
+                          <span style={{ width: `${getPasswordStrength(signupPassword).percent}%` }} />
+                        </div>
+                        <p className="strength-label">Password strength: {getPasswordStrength(signupPassword).label}</p>
+                        {validatePasswordStrict(signupPassword).valid ? (
+                          <p className="strength-rules rule-pass">Strong password ✓</p>
+                        ) : (
+                          <p className="strength-rules">Still needs: {validatePasswordStrict(signupPassword).errors.join(', ')}.</p>
+                        )}
+                      </div>
+                    )}
                     <label className="form-label">
                       Confirm password
                       <input name="confirmPassword" type="password" placeholder="Confirm password" required />
@@ -574,6 +661,87 @@ export default function App() {
                 ? 'Login is gated by sign up: enter the email and password you registered. Product search, supplier comparison, Supabase order saving, and order history retrieval stay connected to the existing backend.'
                 : 'This prototype saves buyer profile details to Supabase for demonstration. Your login email and password are stored securely in your browser so you can sign in afterwards.'}
             </p>
+          </section>
+        </main>
+      )}
+
+      {screen === 'mfa' && pendingAuthUser && (
+        <main className="auth-layout">
+          <section className="hero-copy">
+            <span className="badge">Two-Factor Authentication</span>
+            <h2>One more step to keep your account secure</h2>
+            <p>
+              For extra security, Aayudh International adds a second verification step after
+              your password. Enter the 6-digit verification code below to finish signing in.
+            </p>
+          </section>
+
+          <section className="auth-card">
+            <span className="badge">Verification Code</span>
+            <h2>Enter your code</h2>
+            <p>
+              A 6-digit code was generated for <strong>{pendingAuthUser.email}</strong>. In a
+              live deployment this would be emailed or texted to you; for this demo it is shown
+              below so the marker can see the two-factor step working.
+            </p>
+
+            <div className="otp-demo-code" aria-label="Demo verification code">{otpCode}</div>
+            <p className="privacy-note">
+              Demo only: in production this code is sent privately to your email or phone and is
+              never shown on screen.
+            </p>
+
+            <form
+              className="form"
+              onSubmit={(event) => {
+                event.preventDefault()
+                if (otpInput.trim() === otpCode) {
+                  setUser(pendingAuthUser)
+                  setPendingAuthUser(null)
+                  setOtpInput('')
+                  setOtpError('')
+                  setScreen('dashboard')
+                } else {
+                  setOtpError('Incorrect code. Please enter the 6-digit code shown above.')
+                }
+              }}
+            >
+              <input
+                value={otpInput}
+                onChange={(event) => setOtpInput(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                inputMode="numeric"
+                placeholder="Enter 6-digit code"
+                required
+              />
+              {otpError && <p className="privacy-note auth-error">{otpError}</p>}
+              <button type="submit">Verify & Continue</button>
+            </form>
+
+            <div className="nav-buttons">
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  setOtpCode(generateOtp())
+                  setOtpInput('')
+                  setOtpError('')
+                }}
+              >
+                Resend Code
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  setPendingAuthUser(null)
+                  setOtpInput('')
+                  setOtpError('')
+                  setScreen('login')
+                }}
+              >
+                Back to Login
+              </button>
+            </div>
           </section>
         </main>
       )}
@@ -731,13 +899,89 @@ export default function App() {
             </section>
 
             <section className="card">
-              <span className="badge">Prototype Only</span>
-              <h3>Password</h3>
+              <span className="badge">Security</span>
+              <h3>Change password</h3>
               <p>
-                Password changes are shown as a prototype section only. Authentication is a
-                frontend demo and does not modify backend or Supabase auth settings.
+                Update the password for your account. Your new password must meet the strict
+                security rules (12+ characters, with upper and lower case, a number and a symbol).
               </p>
-              <button className="secondary" type="button">Password update prototype</button>
+              <form
+                className="form"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  setCpError('')
+                  setCpSuccess('')
+
+                  const accounts = getStoredAccounts()
+                  const account = accounts[String(user.email).trim().toLowerCase()]
+
+                  if (!account) {
+                    setCpError('No saved account was found for this email.')
+                    return
+                  }
+                  if (account.password !== cpCurrent) {
+                    setCpError('Your current password is incorrect.')
+                    return
+                  }
+                  const newCheck = validatePasswordStrict(cpNew)
+                  if (!newCheck.valid) {
+                    setCpError('New password is not strong enough. It needs: ' + newCheck.errors.join(', ') + '.')
+                    return
+                  }
+                  if (cpNew === cpCurrent) {
+                    setCpError('Your new password must be different from your current password.')
+                    return
+                  }
+                  if (cpNew !== cpConfirm) {
+                    setCpError('New password and confirmation do not match.')
+                    return
+                  }
+
+                  saveStoredAccount(user.email, cpNew, account.name)
+                  setCpCurrent('')
+                  setCpNew('')
+                  setCpConfirm('')
+                  setCpSuccess('Password updated successfully. Use your new password the next time you log in.')
+                }}
+              >
+                <input
+                  type="password"
+                  value={cpCurrent}
+                  onChange={(event) => setCpCurrent(event.target.value)}
+                  placeholder="Current password"
+                  required
+                />
+                <input
+                  type="password"
+                  value={cpNew}
+                  onChange={(event) => setCpNew(event.target.value)}
+                  placeholder="New password"
+                  required
+                />
+                {cpNew && (
+                  <div className="password-strength">
+                    <div className={`strength-bar strength-${getPasswordStrength(cpNew).level}`}>
+                      <span style={{ width: `${getPasswordStrength(cpNew).percent}%` }} />
+                    </div>
+                    <p className="strength-label">Password strength: {getPasswordStrength(cpNew).label}</p>
+                    {validatePasswordStrict(cpNew).valid ? (
+                      <p className="strength-rules rule-pass">Strong password ✓</p>
+                    ) : (
+                      <p className="strength-rules">Still needs: {validatePasswordStrict(cpNew).errors.join(', ')}.</p>
+                    )}
+                  </div>
+                )}
+                <input
+                  type="password"
+                  value={cpConfirm}
+                  onChange={(event) => setCpConfirm(event.target.value)}
+                  placeholder="Confirm new password"
+                  required
+                />
+                {cpError && <p className="privacy-note auth-error">{cpError}</p>}
+                {cpSuccess && <p className="privacy-note auth-success">{cpSuccess}</p>}
+                <button type="submit">Update Password</button>
+              </form>
             </section>
 
             <section className="card">
