@@ -51,6 +51,112 @@ function getCategoryDetails(category) {
   }
 }
 
+// --- Product image helpers (web photos with safe fallback) ---
+const PRODUCT_IMAGE_KEYWORDS = [
+  ['glove', 'medical,gloves'],
+  ['mask', 'face,mask,medical'],
+  ['respirator', 'respirator,mask'],
+  ['gown', 'medical,gown,ppe'],
+  ['apron', 'apron,medical'],
+  ['face shield', 'face,shield,protective'],
+  ['shield', 'face,shield,protective'],
+  ['syringe', 'syringe,injection'],
+  ['needle', 'needle,syringe'],
+  ['cannula', 'iv,cannula,medical'],
+  ['catheter', 'catheter,medical'],
+  ['iv set', 'iv,drip,medical'],
+  ['drip', 'iv,drip,medical'],
+  ['thermometer', 'thermometer,medical'],
+  ['oximeter', 'pulse,oximeter'],
+  ['stethoscope', 'stethoscope'],
+  ['bp monitor', 'blood,pressure,monitor'],
+  ['blood pressure', 'blood,pressure,monitor'],
+  ['monitor', 'patient,monitor,medical'],
+  ['scalpel', 'scalpel,surgical'],
+  ['forceps', 'forceps,surgical'],
+  ['scissors', 'surgical,scissors'],
+  ['suture', 'suture,surgical'],
+  ['bandage', 'bandage,wound'],
+  ['gauze', 'gauze,bandage'],
+  ['cotton', 'cotton,medical'],
+  ['dressing', 'wound,dressing'],
+  ['sanitizer', 'hand,sanitizer'],
+  ['disinfectant', 'disinfectant,cleaning'],
+  ['antiseptic', 'antiseptic,medical'],
+  ['test kit', 'lab,test,kit'],
+  ['test', 'laboratory,test'],
+  ['tube', 'test,tube,laboratory'],
+  ['wheelchair', 'wheelchair'],
+  ['oxygen', 'oxygen,cylinder,medical'],
+  ['nebulizer', 'nebulizer,medical'],
+  ['bed', 'hospital,bed'],
+]
+
+const CATEGORY_IMAGE_KEYWORDS = {
+  'PPE': 'medical,ppe,protective',
+  'Diagnostic Equipment': 'medical,diagnostic,equipment',
+  'Injection Equipment': 'syringe,injection,medical',
+  'Hospital Consumables': 'medical,supplies,hospital',
+  'Surgical Instruments': 'surgical,instruments',
+}
+
+function hashString(text) {
+  let hash = 0
+  const str = String(text || '')
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i)
+    hash |= 0
+  }
+  return Math.abs(hash)
+}
+
+function getProductKeywords(product) {
+  const name = String(product.product_name || '').toLowerCase()
+  for (const [term, kw] of PRODUCT_IMAGE_KEYWORDS) {
+    if (name.includes(term)) return kw
+  }
+  return CATEGORY_IMAGE_KEYWORDS[product.category] || 'medical,healthcare,equipment'
+}
+
+// Build an ordered list of REAL-photo candidate URLs for a product.
+// `index` makes every product's images unique (different lock / seed),
+// so no two products ever share the same picture. None of these sources
+// overlay any logo or branding on the photo.
+function getProductImageSources(product, index) {
+  const keywords = getProductKeywords(product)
+  const unique = (index >= 0 ? index : hashString(product.product_name) % 997) + 1
+  const seed = encodeURIComponent(`${product.product_name || 'item'}-${unique}`)
+  return [
+    // 1) Real medical photo matched to the product keyword (unique per product via lock).
+    `https://loremflickr.com/600/400/${keywords}?lock=${unique}`,
+    // 2) Reliable real-photo fallback, still unique per product, never branded.
+    `https://picsum.photos/seed/${seed}/600/400`,
+  ]
+}
+
+function ProductImage({ product, index }) {
+  const sources = getProductImageSources(product, index)
+  const [tier, setTier] = useState(0)
+
+  if (tier >= sources.length) {
+    return (
+      <div className="product-image fallback" aria-hidden="true">
+        <span>{getCategoryDetails(product.category).icon}</span>
+      </div>
+    )
+  }
+
+  return (
+    <img
+      className="product-image"
+      src={sources[tier]}
+      alt={product.product_name}
+      loading="lazy"
+      onError={() => setTier((current) => current + 1)}
+    />
+  )
+}
+
 const ACCOUNTS_STORAGE_KEY = 'aayudh_accounts'
 
 function getStoredAccounts() {
@@ -247,6 +353,20 @@ export default function App() {
     () => getRecommendedOffer(offersForProduct),
     [offersForProduct]
   )
+
+  // Each user may only see their OWN purchase history, not all company orders.
+  const visibleOrders = useMemo(() => {
+    if (!user || !user.email) return []
+    const myEmail = String(user.email).trim().toLowerCase()
+    return orders.filter((order) => String(order.email || '').trim().toLowerCase() === myEmail)
+  }, [orders, user])
+
+  // Stable unique index per product so every card gets a different photo.
+  const productImageIndex = useMemo(() => {
+    const map = {}
+    products.forEach((product, i) => { map[product.product_name] = i })
+    return map
+  }, [products])
 
   function clearPaymentFields() {
     setPaymentMethod('Cash on Delivery')
@@ -791,7 +911,7 @@ export default function App() {
             </article>
             <article className="overview-card">
               <span>Saved orders</span>
-              <strong>{orders.length > 0 ? orders.length : 'Live'}</strong>
+              <strong>{visibleOrders.length > 0 ? visibleOrders.length : 'Live'}</strong>
             </article>
           </section>
 
@@ -1122,6 +1242,7 @@ export default function App() {
                   <div className="product-row" aria-label={`${categoryGroup.category} products`}>
                     {categoryGroup.products.map((product) => (
                       <article className="product-card" key={product.product_name}>
+                        <ProductImage product={product} index={productImageIndex[product.product_name]} />
                         <span className="badge">{product.category}</span>
                         <h4>{product.product_name}</h4>
                         <p>{product.description}</p>
@@ -1193,21 +1314,38 @@ export default function App() {
       )}
 
       {screen === 'order' && selectedOffer && (
-        <main className="card">
-          <span className="badge">Order Form</span>
-          <h2>Place order request</h2>
-          <p>
-            Product: <strong>{selectedProduct.product_name}</strong>
-            <br />
-            Supplier: <strong>{selectedOffer.supplier_name}</strong>
-          </p>
+        <main>
+          <section className="page-heading">
+            <div>
+              <span className="badge">Order Form</span>
+              <h2>Place order request</h2>
+              <p>Review your selection, then continue to payment.</p>
+            </div>
+            <button className="secondary" onClick={() => setScreen('offers')}>Back</button>
+          </section>
 
-          <form className="form" onSubmit={submitOrder}>
-            <input name="quantity" type="number" min="1" placeholder="Quantity" required />
-            <input name="delivery_location" placeholder="Delivery location" required />
-            <input name="contact_number" placeholder="Contact number" required />
-            <button type="submit">Continue to Payment</button>
-          </form>
+          <section className="card">
+            <p>
+              Product: <strong>{selectedProduct.product_name}</strong>
+              <br />
+              Supplier: <strong>{selectedOffer.supplier_name}</strong>
+            </p>
+
+            <form className="form" onSubmit={submitOrder}>
+              <input name="quantity" type="number" min="1" placeholder="Quantity" required />
+              <input name="delivery_location" placeholder="Delivery location" required />
+              <input name="contact_number" placeholder="Contact number" required />
+              <div className="nav-buttons">
+                <button type="submit">Continue to Payment</button>
+                <button type="button" className="secondary" onClick={() => setScreen('products')}>
+                  Choose Another Product
+                </button>
+                <button type="button" className="secondary" onClick={resetToDashboard}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </section>
         </main>
       )}
 
@@ -1345,20 +1483,20 @@ export default function App() {
         <main>
           <section className="page-heading">
             <div>
-              <span className="badge">Order History</span>
-              <h2>Orders retrieved from Supabase</h2>
-              <p>This page displays saved orders retrieved through the Python backend.</p>
+              <span className="badge">My Purchase History</span>
+              <h2>Your saved orders</h2>
+              <p>This page shows only the orders placed from your own account.</p>
             </div>
             <button className="secondary" onClick={resetToDashboard}>Back</button>
           </section>
 
-          {orders.length === 0 ? (
+          {visibleOrders.length === 0 ? (
             <section className="card">
-              <p>No orders saved yet.</p>
+              <p>You have no saved purchase history yet.</p>
             </section>
           ) : (
             <div className="grid">
-              {orders.map((order) => (
+              {visibleOrders.map((order) => (
                 <section className="card" key={order.id}>
                   <h3>{order.product_name}</h3>
                   <p><strong>Customer:</strong> {order.customer_name}</p>
